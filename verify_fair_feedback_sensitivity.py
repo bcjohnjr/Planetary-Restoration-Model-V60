@@ -29,11 +29,12 @@ for e in experiments:
     assert len(z) == 651, (e, len(z))
     assert float(z.timebound_year.min()) == 1750.0
     assert float(z.timebound_year.max()) == 2400.0
-    late = z[z.timebound_year >= 2027]
-    assert np.isfinite(late[[
-        'delta_co2_p05_ppm','delta_co2_p50_ppm','delta_co2_p95_ppm',
-        'fraction_p05','fraction_p50','fraction_p95'
-    ]]).all().all()
+    # 2026 and 2027 have zero cumulative programme CDR; response fractions
+    # are therefore undefined until timebound 2028. CO2 deltas remain auditable.
+    core = z[['delta_co2_p05_ppm','delta_co2_p50_ppm','delta_co2_p95_ppm']]
+    assert np.isfinite(core).all().all()
+    late = z[z.timebound_year >= 2028]
+    assert np.isfinite(late[['fraction_p05','fraction_p50','fraction_p95']]).all().all()
 
 # Exact regression lock to the independently archived Run 8 pair.
 def row(exp, year):
@@ -41,6 +42,7 @@ def row(exp, year):
     return z.iloc[int(np.argmin(np.abs(z.timebound_year.to_numpy(float)-year)))]
 
 r = row('legacy_strict_pair', 2300)
+# Run-8 regression lock. Allow only sub-micro-ppm platform floating-point noise.
 expected_delta_2300 = 104.03176804841752
 expected_frac_2300 = 0.3083303157940670
 expected_frac_2184 = 0.3698648683773295
