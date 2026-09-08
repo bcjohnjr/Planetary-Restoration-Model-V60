@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """FaIR 2.2.4 referee close-out experiments for V60/V61.
 
 This script addresses the remaining scientific objections in the V60 cross-check:
