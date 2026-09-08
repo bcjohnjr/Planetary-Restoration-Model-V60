@@ -28,7 +28,13 @@ for e in experiments:
     z = p[p.experiment == e]
     assert len(z) == 275
     assert z.year.min() == 2026 and z.year.max() == 2300
-    assert np.isfinite(z[['co2_on_ppm','co2_off_ppm','delta_co2_ppm','response_fraction']]).all().all()
+    # In 2026 cumulative CDR is zero, so response_fraction is undefined there.
+    core = z[['co2_on_ppm','co2_off_ppm','delta_co2_ppm']]
+    assert np.isfinite(core).all().all()
+    late = z[z.year >= 2027]
+    assert np.isfinite(late[['response_fraction']]).all().all()
+    y2026 = z[z.year == 2026].iloc[0]
+    assert float(y2026.cumulative_cdr_gtco2) == 0.0
 
 s = json.load(open('hector_feedback_sensitivity_summary.json'))
 assert s['model'] == 'Hector' and s['version'] == '3.5.0'

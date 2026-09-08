@@ -84,9 +84,9 @@ REVERSAL_FRACTION = float(can.stored_carbon_reversal_gtco2.sum() / CAN_CDR)
 PF_CARBON_PGC_PER_C = 18.0
 PF_ACTIVATION_C = 1.20
 PF_TAU_YR = 50.0
-PF_DAMPING = 0.60
+PF_DAMPING = 0.45
 PF_TOL_GTCO2_YR = 1e-4
-PF_MAX_ITER = 24
+PF_MAX_ITER = 36
 
 
 def quantiles(x, probs=(.05, .5, .95)):

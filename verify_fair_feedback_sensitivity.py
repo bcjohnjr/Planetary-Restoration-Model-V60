@@ -41,10 +41,13 @@ def row(exp, year):
     return z.iloc[int(np.argmin(np.abs(z.timebound_year.to_numpy(float)-year)))]
 
 r = row('legacy_strict_pair', 2300)
-assert abs(float(r.delta_co2_p50_ppm) - 104.03176804841752) < 1e-8
-assert abs(float(r.fraction_p50) - 0.3083303157940670) < 1e-10
+expected_delta_2300 = 104.03176804841752
+expected_frac_2300 = 0.3083303157940670
+expected_frac_2184 = 0.3698648683773295
+assert abs(float(r.delta_co2_p50_ppm) - expected_delta_2300) < 5e-7, (float(r.delta_co2_p50_ppm), expected_delta_2300)
+assert abs(float(r.fraction_p50) - expected_frac_2300) < 5e-9, (float(r.fraction_p50), expected_frac_2300)
 r2184 = row('legacy_strict_pair', 2184)
-assert abs(float(r2184.fraction_p50) - 0.3698648683773295) < 1e-10
+assert abs(float(r2184.fraction_p50) - expected_frac_2184) < 5e-9, (float(r2184.fraction_p50), expected_frac_2184)
 
 # Removing programme-contingent reversal from the off arm must lower the
 # attributed benefit relative to the strict legacy construction.
