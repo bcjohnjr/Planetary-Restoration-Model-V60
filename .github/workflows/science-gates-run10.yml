@@ -1,1 +1,163 @@
+# RUN10_CLOSEOUT_ID: V60-2026-09-08-referee-closeout
+name: V60 referee closeout — feedback + policy inverse
 
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+  FAIR_SOURCE_DIR: /tmp/FAIR-v2.2.4
+
+jobs:
+  fair-feedback:
+    name: FaIR 2.2.4 — programme-feedback sensitivity
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install pinned FaIR workload
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Clone official FaIR 2.2.4 calibration source
+        run: |
+          rm -rf "$FAIR_SOURCE_DIR"
+          git clone --depth 1 --branch v2.2.4 https://github.com/OMS-NetZero/FAIR.git "$FAIR_SOURCE_DIR"
+      - name: Verify inputs
+        run: |
+          test -f external_validation_net_co2_trajectory.csv
+          test -f run_fair_referee_closeout.py
+          test -f verify_fair_feedback_sensitivity.py
+          test -f "$FAIR_SOURCE_DIR/examples/data/calibrated_constrained_ensemble/calibrated_constrained_parameters_calibration1.4.1.csv"
+          python -m py_compile run_fair_referee_closeout.py verify_fair_feedback_sensitivity.py
+      - name: Run FaIR feedback sensitivity
+        run: |
+          set -o pipefail
+          python run_fair_referee_closeout.py --mode feedback 2>&1 | tee FAIR_FEEDBACK_CONSOLE.log
+      - name: Verify FaIR feedback outputs
+        run: python verify_fair_feedback_sensitivity.py
+      - name: Upload FaIR feedback artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fair-feedback-sensitivity
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fair_feedback_sensitivity_pair.csv
+            fair_feedback_sensitivity_selected.csv
+            fair_feedback_sensitivity_members.npz
+            fair_feedback_sensitivity_permafrost.csv
+            fair_feedback_sensitivity_convergence.csv
+            fair_feedback_sensitivity_forcing_audit.csv
+            fair_feedback_sensitivity_summary.json
+            FAIR_FEEDBACK_CONSOLE.log
+
+  fair-policy-inverse:
+    name: FaIR policy inverse — ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [2200, 2300, 2400]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install pinned FaIR workload
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Clone official FaIR 2.2.4 calibration source
+        run: |
+          rm -rf "$FAIR_SOURCE_DIR"
+          git clone --depth 1 --branch v2.2.4 https://github.com/OMS-NetZero/FAIR.git "$FAIR_SOURCE_DIR"
+      - name: Verify inputs
+        run: |
+          test -f external_validation_net_co2_trajectory.csv
+          test -f run_fair_referee_closeout.py
+          test -f verify_fair_policy_inverse.py
+          python -m py_compile run_fair_referee_closeout.py verify_fair_policy_inverse.py
+      - name: Run leakage-corrected median + p90 inverse
+        run: |
+          set -o pipefail
+          python run_fair_referee_closeout.py --mode inverse --target ${{ matrix.target }} 2>&1 | tee FAIR_POLICY_INVERSE_${{ matrix.target }}_CONSOLE.log
+      - name: Verify policy inverse
+        run: python verify_fair_policy_inverse.py --target ${{ matrix.target }}
+      - name: Upload inverse artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fair-policy-inverse-${{ matrix.target }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fair_policy_inverse_${{ matrix.target }}_summary.csv
+            fair_policy_inverse_${{ matrix.target }}_members.csv
+            fair_policy_inverse_${{ matrix.target }}_summary.json
+            FAIR_POLICY_INVERSE_${{ matrix.target }}_CONSOLE.log
+
+  hector-feedback:
+    name: Hector 3.5.0 — programme-feedback sensitivity
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.5.1"
+          use-public-rspm: true
+      - name: System libraries for Hector
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-dev libboost-filesystem-dev libboost-system-dev
+      - name: Install Hector 3.5.0
+        run: |
+          Rscript -e 'install.packages(c("Rcpp", "BH", "jsonlite"), repos="https://cloud.r-project.org")'
+          rm -rf /tmp/hector-v3.5.0
+          git clone --depth 1 --branch v3.5.0 https://github.com/JGCRI/hector.git /tmp/hector-v3.5.0
+          R CMD INSTALL --no-multiarch --with-keep.source /tmp/hector-v3.5.0
+          Rscript -e 'library(hector); stopifnot(as.character(packageVersion("hector")) == "3.5.0")'
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify inputs and scripts
+        run: |
+          test -f external_validation_net_co2_trajectory.csv
+          test -f run_hector_feedback_sensitivity.R
+          test -f verify_hector_feedback_sensitivity.py
+          python -m py_compile verify_hector_feedback_sensitivity.py
+      - name: Run Hector feedback sensitivity
+        run: |
+          set -o pipefail
+          Rscript run_hector_feedback_sensitivity.R 2>&1 | tee HECTOR_FEEDBACK_SENSITIVITY_CONSOLE.log
+      - name: Verify Hector outputs
+        run: python verify_hector_feedback_sensitivity.py
+      - name: Upload Hector feedback artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: hector-feedback-sensitivity
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            hector_feedback_sensitivity_pair.csv
+            hector_feedback_sensitivity_selected.csv
+            hector_feedback_sensitivity_long.csv
+            hector_feedback_sensitivity_forcing_audit.csv
+            hector_feedback_sensitivity_permafrost.csv
+            hector_feedback_sensitivity_convergence.csv
+            hector_feedback_sensitivity_summary.json
+            HECTOR_FEEDBACK_SENSITIVITY_CONSOLE.log
